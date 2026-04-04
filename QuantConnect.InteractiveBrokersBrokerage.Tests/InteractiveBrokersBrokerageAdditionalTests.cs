@@ -703,6 +703,9 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
             orderProcessor.AddOrder(request);
             submittedEvent.WaitOneAssertFail(10000, "Order was not submitted");
 
+            // Get the order from the transaction handler — it has the BrokerId assigned by the brokerage
+            order = orderProcessor.GetOpenOrders().Single();
+
             var openOrder = brokerage.GetOpenOrders().Single(o => o.BrokerId.Contains(order.BrokerId[0]));
             Assert.IsInstanceOf<PeggedToMidpointOrder>(openOrder);
             var pegOrder = (PeggedToMidpointOrder)openOrder;
