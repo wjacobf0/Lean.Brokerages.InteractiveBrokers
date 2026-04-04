@@ -123,5 +123,11 @@ namespace QuantConnect.Brokerages.InteractiveBrokers.Client
         /// Limit if Touched Order.
         /// </summary>
         public const string LimitIfTouched = "LIT";
+
+        /// <summary>
+        /// Pegged-to-Midpoint Order. Pegs to the NBBO midpoint with an optional limit price cap/floor and offset.
+        /// Stocks, Options
+        /// </summary>
+        public const string PeggedToMidpoint = "PEG MID";
     }
 }

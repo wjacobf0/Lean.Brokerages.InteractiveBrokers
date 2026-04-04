@@ -658,6 +658,59 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
             Assert.IsNull(canceledBrokerageOrder);
         }
 
+        [TestCase(-100, 600, 0)]
+        [TestCase(100, 600, 0)]
+        [TestCase(-100, 600, 0.01)]
+        [TestCase(100, 600, 0.01)]
+        public void SendPeggedToMidpointOrder(decimal quantity, decimal limitPrice, decimal limitPriceOffset)
+        {
+            // wait for the previous run to finish, avoid any race condition
+            Thread.Sleep(2000);
+
+            var algorithm = new AlgorithmStub();
+            using var brokerage = new InteractiveBrokersBrokerage(algorithm, algorithm.Transactions, algorithm.Portfolio);
+
+            var orderProcessor = new BrokerageTransactionHandler();
+            orderProcessor.Initialize(algorithm, brokerage, new TestResultHandler());
+            algorithm.Transactions.SetOrderProcessor(orderProcessor);
+
+            brokerage.Connect();
+
+            var openOrders = brokerage.GetOpenOrders();
+            foreach (var o in openOrders)
+            {
+                brokerage.CancelOrder(o);
+            }
+
+            var symbol = Symbols.SPY;
+            algorithm.AddEquity("SPY");
+            algorithm.SetFinishedWarmingUp();
+
+            var request = new SubmitOrderRequest(OrderType.PeggedToMidpoint, symbol.SecurityType, symbol, quantity,
+                0, limitPrice, limitPriceOffset, 0, false, DateTime.UtcNow, string.Empty);
+            algorithm.Transactions.SetOrderId(request);
+            var order = Order.CreateOrder(request);
+
+            using var submittedEvent = new ManualResetEvent(false);
+            brokerage.OrdersStatusChanged += (_, orderEvents) =>
+            {
+                if (orderEvents.Single().Status == OrderStatus.Submitted)
+                {
+                    submittedEvent.Set();
+                }
+            };
+
+            orderProcessor.AddOrder(request);
+            submittedEvent.WaitOneAssertFail(10000, "Order was not submitted");
+
+            var openOrder = brokerage.GetOpenOrders().Single(o => o.BrokerId.Contains(order.BrokerId[0]));
+            Assert.IsInstanceOf<PeggedToMidpointOrder>(openOrder);
+            var pegOrder = (PeggedToMidpointOrder)openOrder;
+            Assert.AreEqual(limitPrice, pegOrder.LimitPrice);
+
+            brokerage.CancelOrder(order);
+        }
+
         [TestCase(-100, 450, 445)]
         [TestCase(100, 450, 455)]
         public void SendStopLimitOrder(decimal quantity, decimal stopPrice, decimal limitPrice)

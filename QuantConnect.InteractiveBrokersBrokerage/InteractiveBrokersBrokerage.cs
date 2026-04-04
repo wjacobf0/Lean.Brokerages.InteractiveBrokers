@@ -2897,6 +2897,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             var orderProperties = order.Properties as InteractiveBrokersOrderProperties;
             if (order.Type == OrderType.Limit ||
                 order.Type == OrderType.LimitIfTouched ||
+                order.Type == OrderType.PeggedToMidpoint ||
                 order.Type == OrderType.StopMarket ||
                 order.Type == OrderType.StopLimit ||
                 order.Type == OrderType.TrailingStop)
@@ -2951,6 +2952,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             var stopLimitOrder = order as StopLimitOrder;
             var trailingStopOrder = order as TrailingStopOrder;
             var limitIfTouchedOrder = order as LimitIfTouchedOrder;
+            var peggedToMidpointOrder = order as PeggedToMidpointOrder;
             var comboLimitOrder = order as ComboLimitOrder;
             var comboLegLimitOrder = order as ComboLegLimitOrder;
             var comboMarketOrder = order as ComboMarketOrder;
@@ -3000,6 +3002,11 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             {
                 ibOrder.LmtPrice = NormalizePriceToBrokerage(limitIfTouchedOrder.LimitPrice, contract, order.Symbol);
                 ibOrder.AuxPrice = NormalizePriceToBrokerage(limitIfTouchedOrder.TriggerPrice, contract, order.Symbol);
+            }
+            else if (peggedToMidpointOrder != null)
+            {
+                ibOrder.LmtPrice = NormalizePriceToBrokerage(peggedToMidpointOrder.LimitPrice, contract, order.Symbol);
+                ibOrder.AuxPrice = NormalizePriceToBrokerage(peggedToMidpointOrder.LimitPriceOffset, contract, order.Symbol);
             }
             else if (comboLimitOrder != null)
             {
@@ -3252,6 +3259,15 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                     );
                     break;
 
+                case OrderType.PeggedToMidpoint:
+                    order = new PeggedToMidpointOrder(mappedSymbol,
+                        quantity,
+                        NormalizePriceToLean(limitPrice, mappedSymbol),
+                        NormalizePriceToLean(auxPrice, mappedSymbol),
+                        new DateTime()
+                    );
+                    break;
+
                 case OrderType.ComboMarket:
                     order = new ComboMarketOrder(mappedSymbol,
                         quantity,
@@ -3486,6 +3502,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 case OrderType.ComboLegLimit: return IB.OrderType.Limit;
                 case OrderType.ComboLimit: return IB.OrderType.Limit;
                 case OrderType.ComboMarket: return IB.OrderType.Market;
+                case OrderType.PeggedToMidpoint: return IB.OrderType.PeggedToMidpoint;
                 default:
                     throw new InvalidEnumArgumentException(nameof(type), (int)type, typeof(OrderType));
             }
@@ -3503,6 +3520,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 case IB.OrderType.StopLimit: return OrderType.StopLimit;
                 case IB.OrderType.TrailingStop: return OrderType.TrailingStop;
                 case IB.OrderType.LimitIfTouched: return OrderType.LimitIfTouched;
+                case IB.OrderType.PeggedToMidpoint: return OrderType.PeggedToMidpoint;
                 case IB.OrderType.MarketOnClose: return OrderType.MarketOnClose;
 
                 case IB.OrderType.Market:
